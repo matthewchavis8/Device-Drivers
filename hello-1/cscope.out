@@ -1,0 +1,191 @@
+cscope 15 $HOME/Dev/Device-Drivers/hello-1               0000001229
+	@hello-1.c
+
+1 
+	~"lšux/´štk.h
+"
+
+2 
+	~<lšux/moduË.h
+>
+
+3 
+	~<lšux/š™.h
+>
+
+5 
+MODULE_LICENSE
+("GPL");
+
+6 
+MODULE_DESCRIPTION
+("This is my first Module for hello world");
+
+8 
+	$h–lo_š™
+() {
+
+9 
+	`´štk
+(
+KERN_ALERT
+ " AM I‡live\À%s\n", 
+__FILE__
+);
+
+11 
+	}
+}
+
+13 
+	$h–lo_ex™
+() {
+
+14 
+	`´štk
+(
+KERN_ALERT
+ "Goodbye world \n");
+
+15 
+	}
+}
+
+17 
+moduË_š™
+(
+h–lo_š™
+);
+
+18 
+moduË_ex™
+(
+h–lo_ex™
+);
+
+	@hello-1.mod.c
+
+1 
+	~<lšux/moduË.h
+>
+
+2 
+	~<lšux/expÜt-š‹º®.h
+>
+
+3 
+	~<lšux/compž”.h
+>
+
+5 
+MODULE_INFO
+(
+Çme
+, 
+KBUILD_MODNAME
+);
+
+7 
+__visibË
+ 
+moduË
+ 
+__this_moduË
+
+
+8 
+__£ùiÚ
+(".gnu.linkonce.this_module") = {
+
+9 .
+Çme
+ = 
+KBUILD_MODNAME
+,
+
+10 .
+	gš™
+ = 
+š™_moduË
+,
+
+11 #ifdeà
+CONFIG_MODULE_UNLOAD
+
+
+12 .
+	gex™
+ = 
+þ—nup_moduË
+,
+
+14 .
+	g¬ch
+ = 
+MODULE_ARCH_INIT
+,
+
+19 cÚ¡ 
+modv”siÚ_šfo
+ 
+	g____v”siÚs
+[]
+
+20 
+__u£d
+ 
+__£ùiÚ
+("__versions") = {
+
+25 
+MODULE_INFO
+(
+d•’ds
+, "");
+
+28 
+MODULE_INFO
+(
+¤cv”siÚ
+, "E32E9BAEA71F6C5DCAF32D5");
+
+	@/usr/include/linux/module.h
+
+2 #iâdeà
+_LINUX_MODULE_H
+
+
+3 
+	#_LINUX_MODULE_H
+
+
+	)
+
+6 
+	#MODULE_INIT_IGNORE_MODVERSIONS
+ 1
+
+	)
+
+7 
+	#MODULE_INIT_IGNORE_VERMAGIC
+ 2
+
+	)
+
+8 
+	#MODULE_INIT_COMPRESSED_FILE
+ 4
+
+	)
+
+	@
+1
+.
+1
+/usr/include
+3
+52
+hello-1.c
+hello-1.mod.c
+/usr/include/linux/module.h
