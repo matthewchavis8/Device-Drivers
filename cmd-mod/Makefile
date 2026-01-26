@@ -1,10 +1,10 @@
-obj-m 		+= kernel-oops-mod.o
+obj-m 		+= cmd-mod.o
 
 KDIR      := /lib/modules/$(shell uname -r)/build
 PWD       := $(CURDIR)
 
 # Build Configs
-ccflags-y += -Werror -Wextra -O3 -g
+ccflags-y += -Werror -Wextra -O3
 
 # Build Normal
 all:
