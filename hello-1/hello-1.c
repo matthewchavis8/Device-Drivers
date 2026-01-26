@@ -1,4 +1,3 @@
-
 #include "linux/printk.h"
 #include <linux/module.h>
 #include <linux/init.h>
