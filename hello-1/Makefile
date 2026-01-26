@@ -12,15 +12,10 @@ all:
 
 # Build compile_commands.json
 json:
-	$(MAKE) -C $(KDIR) M=$(PWD) modules CC=gcc
+	$(MAKE) -C $(KDIR) M=$(PWD) compile_commands.json 
 
 # Clean Folder
 clean:
-	rm -f *.o *.ko *.mod.* *.symvers *.order *.cmd
-	rm -rf .tmp_versions
-	rm -rf .cache
-	rm *.mod
-	rm .*
 	$(MAKE) -C $(KDIR) M=$(PWD) clean
 
 
