@@ -12,7 +12,7 @@ all:
 
 # Build compile_commands.json
 json:
-	$(MAKE) -C $(KDIR) M=$(PWD) compile_commands.json 
+	bear -- $(MAKE) -C $(KDIR) M=$(PWD)
 
 # Clean Folder
 clean:
