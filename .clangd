@@ -1,0 +1,17 @@
+CompileFlags:
+  Add:
+    - "-I/lib/modules/6.12.47+rpt-rpi-2712/build/include"
+    - "-I/lib/modules/6.12.47+rpt-rpi-2712/build/arch/arm64/include"
+    - "-I/lib/modules/6.12.47+rpt-rpi-2712/build/arch/arm64/include/generated"
+    - "-I/lib/modules/6.12.47+rpt-rpi-2712/build/include/uapi"
+    - "-I/lib/modules/6.12.47+rpt-rpi-2712/build/arch/arm64/include/uapi"
+    - "-I/lib/modules/6.12.47+rpt-rpi-2712/build/include/generated/uapi"
+    - "-nostdinc"
+    - "-D__KERNEL__"
+    - "-DMODULE"
+  Remove:
+    - "-mabi=*"
+    - "-march=*"
+Diagnostics:
+  UnusedIncludes: None
+  MissingIncludes: None

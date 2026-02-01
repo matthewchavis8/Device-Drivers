@@ -1,4 +1,4 @@
-obj-m 				+= proc-info-mod.o
+obj-m += kernelAlloc-mod.o
 
 KDIR      := /lib/modules/$(shell uname -r)/build
 PWD       := $(CURDIR)
