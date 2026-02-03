@@ -1,0 +1,27 @@
+#include <linux/module.h>
+#include <linux/init.h>
+#include <linux/kernel.h>
+
+extern void task_info_add_for_current(void);
+extern void task_info_remove_expired(void);
+extern void task_info_print_list(const char *msg);
+
+static int list_test_init(void)
+{
+	task_info_add_for_current();
+	task_info_print_list("after new addition");
+
+	return 0;
+}
+
+static void list_test_exit(void)
+{
+	task_info_remove_expired();
+	task_info_print_list("after removing expired");
+}
+
+MODULE_DESCRIPTION("Testing out the exported symbols from list-sync.c");
+MODULE_AUTHOR("Matthew Chavis");
+MODULE_LICENSE("GPL");
+module_init(list_test_init);
+module_exit(list_test_exit);
