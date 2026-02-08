@@ -6,14 +6,16 @@
 #include <linux/uaccess.h>
 #include <linux/fs.h>
 
-#define MAJOR_NUMBER 42
-#define MINOR_NUMBER 0
-#define NUM_MINORS 1
-#define MODULE_NAME  "so2_cdev"
+#define MAJOR_NUMBER  42
+#define MINOR_NUMBER  0
+#define NUM_MINORS    1
+#define MODULE_NAME   "so2_cdev"
+#define MESSAGE       "the dog is matt"
 
 struct so2_device_data {
   struct cdev cdev; // Represents char device
   atomic_t isOpen;  // Atomic variable to ensure only one reader
+  char* msg;        // Buffer for message
 };
 
 // Number of devices
@@ -36,6 +38,30 @@ static int so2_open(struct inode* inode, struct file* file) {
   return 0;
 }
 
+static ssize_t so2_read(struct file* file, char __user* uBuff, size_t size, loff_t* offset) {
+  pr_info("%s method 'read' was called!\n", MODULE_NAME);
+
+  struct so2_device_data* data = (struct so2_device_data*) file->private_data;
+  size_t lenOfStr = strlen(data->msg);
+  // Check if msg is NULL
+  if (!data || !data->msg)
+    return -EINVAL;
+  // Check string length
+  if (*offset >= lenOfStr)
+    return 0;
+  
+  size_t available = lenOfStr - (size_t)*offset;
+  size_t n = (size < available) ? size : available;
+  // Copy kernel buff -> user buff
+  if (copy_to_user(uBuff, data->msg + *offset, n))
+    return -EFAULT;
+
+  // Advance the byte
+  *offset += size;
+
+  return (ssize_t)size;
+}
+
 static int so2_release(struct inode* inode, struct file* file) {
   struct so2_device_data* data;
   pr_info("%s method 'close' was called!\n", MODULE_NAME);
@@ -55,6 +81,7 @@ static int so2_release(struct inode* inode, struct file* file) {
 // Driver operations that will be overloaded
 const struct file_operations so2_fops = {
   .owner    = THIS_MODULE,
+  .read     = so2_read,
   .open     = so2_open,
   .release  = so2_release,
 };
@@ -73,6 +100,7 @@ static int so2_cdev_init(void) {
   for (int i = 0; i < NUM_MINORS; i++) {
     cdev_init(&devices[i].cdev, &so2_fops);
     cdev_add(&devices[i].cdev, MKDEV(MAJOR_NUMBER, i), 1);
+    devices[i].msg = MESSAGE;
   }
 
   pr_info("[LOG] registered %s char device in memory success\n", MODULE_NAME);
