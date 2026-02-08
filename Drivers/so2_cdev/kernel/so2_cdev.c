@@ -11,11 +11,13 @@
 #define NUM_MINORS    1
 #define MODULE_NAME   "so2_cdev"
 #define MESSAGE       "the dog is matt"
+#define MSG_MAX       128
 
 struct so2_device_data {
   struct cdev cdev; // Represents char device
   atomic_t isOpen;  // Atomic variable to ensure only one reader
-  char* msg;        // Buffer for message
+  char     msg[MSG_MAX];
+  size_t   msg_len;
 };
 
 // Number of devices
@@ -44,7 +46,7 @@ static ssize_t so2_read(struct file* file, char __user* uBuff, size_t size, loff
   struct so2_device_data* data = (struct so2_device_data*) file->private_data;
   size_t lenOfStr = strlen(data->msg);
   // Check if msg is NULL
-  if (!data || !data->msg)
+  if (!data)
     return -EINVAL;
   // Check string length
   if (*offset >= lenOfStr)
@@ -57,9 +59,27 @@ static ssize_t so2_read(struct file* file, char __user* uBuff, size_t size, loff
     return -EFAULT;
 
   // Advance the byte
-  *offset += size;
+  *offset += n;
 
   return (ssize_t)size;
+}
+
+static ssize_t so2_write(struct file* file, const char* uBuff, size_t size, loff_t* offset) {
+  pr_info("%s method 'write' was called!\n", MODULE_NAME);
+  
+  struct so2_device_data* data = (struct so2_device_data*) file->private_data;
+  size_t n = (size < (MSG_MAX - 1)) ? size : (MSG_MAX - 1);
+
+  // Copy user buff -> kernel buff
+  if (copy_from_user(data->msg, uBuff, n))
+    return -EFAULT;
+
+  data->msg[n] = '\0';
+  data->msg_len = n;
+
+  *offset = 0;
+
+  return (ssize_t) size;
 }
 
 static int so2_release(struct inode* inode, struct file* file) {
@@ -83,6 +103,7 @@ const struct file_operations so2_fops = {
   .owner    = THIS_MODULE,
   .read     = so2_read,
   .open     = so2_open,
+  .write    = so2_write,
   .release  = so2_release,
 };
 
@@ -100,7 +121,7 @@ static int so2_cdev_init(void) {
   for (int i = 0; i < NUM_MINORS; i++) {
     cdev_init(&devices[i].cdev, &so2_fops);
     cdev_add(&devices[i].cdev, MKDEV(MAJOR_NUMBER, i), 1);
-    devices[i].msg = MESSAGE;
+    strscpy(devices[i].msg, MESSAGE, MSG_MAX);
   }
 
   pr_info("[LOG] registered %s char device in memory success\n", MODULE_NAME);
