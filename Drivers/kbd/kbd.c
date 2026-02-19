@@ -6,17 +6,174 @@
 #include <linux/uaccess.h>
 #include <linux/fs.h>
 #include <linux/irqreturn.h>
+#include <linux/interrupt.h>
+#include <asm/io.h>
+#include <linux/spinlock.h>
 
 #define MAJOR_NUMBER  42
 #define MINOR_NUMBER  0
 #define NUM_MINORS    1
 #define MODULE_NAME   "kbd_driver"
+#define BUFF_SIZE     100
 
 #define I8042_KBD_IRQ		  1
 #define I8042_STATUS_REG	0x64
 #define I8042_DATA_REG		0x60
 
-irqreturn_t kbd_irq_handler(int irq, void* devID) {
+#define SCANCODE_RELEASED_MASK	0x80
+// TODO: Write comment
+typedef struct kbd_dev {
+  struct cdev cdev;
+  spinlock_t lock;
+  char buff[BUFF_SIZE];
+  size_t putIdx;
+  size_t getIdx;
+  size_t cnt;
+} kbd_dev;
+
+static bool get_char(char *c, struct kbd_dev *data) {
+	if (data->cnt > 0) {
+		*c = data->buff[data->getIdx];
+		data->getIdx = (data->getIdx + 1) % BUFF_SIZE;
+		data->cnt--;
+		return true;
+	}
+
+	return false;
+}
+// File operations for the driver 
+// TODO: clean up comments
+// open
+static int kbd_open(struct inode* inode, struct file* file) {
+  struct kbd_dev* data = container_of(inode->i_cdev, kbd_dev, cdev);
+  file->private_data = data;
+
+  return 0;
+}
+// release
+static int kbd_release(struct inode* inode, struct file* file) {
+  return 0;
+}
+// read
+static ssize_t kbd_read(struct file *file,  char *uBuff, size_t size, loff_t *offset) {
+	struct kbd_dev *data = (struct kbd_dev *) file->private_data;
+	size_t read = 0;
+	unsigned long flags;
+	char ch;
+	bool more = true;
+
+	while (size--) {
+		spin_lock_irqsave(&data->lock, flags);
+		more = get_char(&ch, data);
+		spin_unlock_irqrestore(&data->lock, flags);
+
+		if (!more)
+			break;
+
+		if (put_user(ch, uBuff++))
+			return -EFAULT;
+
+		read++;
+	}
+
+	return read;
+}
+
+static void reset_buffer(kbd_dev* dev) {
+  dev->cnt    = 0;
+  dev->getIdx = 0;
+  dev->putIdx = 0;
+}
+
+// Write
+static ssize_t kbd_write(struct file* file, const char* uBuff, size_t size, loff_t* offset) {
+  kbd_dev* dev = (kbd_dev*) file->private_data;
+  unsigned long flags;
+
+  spin_lock_irqsave(&dev->lock, flags);
+  reset_buffer(dev);
+  spin_unlock_irqrestore(&dev->lock, flags);
+
+  return size;
+}
+
+// TODO: Write comment kbd_fops
+static const struct file_operations kbd_fops = {
+  .owner = THIS_MODULE,
+  .open  = kbd_open,
+  .release = kbd_release,
+  .read   = kbd_read,
+  .write  = kbd_write
+};
+
+// intialzie max amount of devices under teh driver
+static kbd_dev devs[NUM_MINORS];
+
+// Read key pressed
+static u8 i8042_read_data(void) {
+ u8 val = inb(I8042_DATA_REG);
+ return val;
+}
+
+/*
+ * Checks if scancode corresponds to key press or release.
+ */
+static int is_key_press(unsigned int scancode) {
+	return !(scancode & SCANCODE_RELEASED_MASK);
+}
+
+static void put_char(kbd_dev* data, char ch) {
+  data->buff[data->getIdx] = ch;
+	data->putIdx = (data->putIdx + 1) % BUFF_SIZE;
+  data->cnt++;
+}
+
+/*
+ * Return the character of the given scancode.
+ * Only works for alphanumeric/space/enter; returns '?' for other
+ * characters.
+ */
+static int get_ascii(unsigned int scancode) {
+	static char *row1 = "1234567890";
+	static char *row2 = "qwertyuiop";
+	static char *row3 = "asdfghjkl";
+	static char *row4 = "zxcvbnm";
+
+	scancode &= ~SCANCODE_RELEASED_MASK;
+	if (scancode >= 0x02 && scancode <= 0x0b)
+		return *(row1 + scancode - 0x02);
+	if (scancode >= 0x10 && scancode <= 0x19)
+		return *(row2 + scancode - 0x10);
+	if (scancode >= 0x1e && scancode <= 0x26)
+		return *(row3 + scancode - 0x1e);
+	if (scancode >= 0x2c && scancode <= 0x32)
+		return *(row4 + scancode - 0x2c);
+	if (scancode == 0x39)
+		return ' ';
+	if (scancode == 0x1c)
+		return '\n';
+	return '?';
+}
+
+// @brief Interrupt Handler for keyboard
+// @param irq 
+// TODO: update comment here
+static irqreturn_t kbd_irq_handler(int irq_no, void* devID) {
+  u32 scancode = i8042_read_data();
+  int pressed = is_key_press(scancode);
+  int ch = get_ascii(scancode);
+
+	pr_info("IRQ %d: scancode=0x%x (%u) pressed=%d ch=%c\n",
+		irq_no, scancode, scancode, pressed, ch);
+
+  if (pressed) {
+    kbd_dev* dev = (kbd_dev*) devID;
+    spin_lock(&dev->lock);
+    put_char(dev, ch);
+    spin_unlock(&dev->lock);
+
+  }
+  
   return IRQ_NONE;
 }
 
@@ -41,6 +198,18 @@ static int kbd_init(void) {
     goto releaseStatusPort;
   }
 
+  // Register device minors
+  for (int i = 0; i < NUM_MINORS; i++) {
+    cdev_init(&devs[i].cdev, &kbd_fops);
+    cdev_add(&devs[i].cdev, MKDEV(MAJOR_NUMBER, MINOR_NUMBER), 1);
+    spin_lock_init(&devs[i].lock);
+  }
+  
+  // Register IRQ handler
+  for (int i = 0; i < NUM_MINORS; i++) {
+    res = request_irq(I8042_KBD_IRQ, kbd_irq_handler, IRQF_SHARED, MODULE_NAME, &devs[i]);
+  }
+
   releaseStatusPort:
     release_region(I8042_STATUS_REG, 1);
   releaseDataPort:
@@ -50,10 +219,20 @@ static int kbd_init(void) {
   failedToAlloc:
     return res;
 
-  return 0;
+  return res;
 }
 static void kbd_exit(void) {
   pr_info("[LOG] kbd driver exited\n");
+
+  // free IRQ
+  for (int i = 0; i < NUM_MINORS; i++) {
+    free_irq(I8042_KBD_IRQ, &devs[i].cdev);
+  }
+  
+  // release devices 
+  for (int i = 0; i < NUM_MINORS; i++) {
+    cdev_del(&devs[i].cdev);
+  }
 
   // releasing the I/O ports
   release_region(I8042_STATUS_REG, 1);
