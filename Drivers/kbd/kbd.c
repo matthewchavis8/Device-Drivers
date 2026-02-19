@@ -21,7 +21,15 @@
 #define I8042_DATA_REG		0x60
 
 #define SCANCODE_RELEASED_MASK	0x80
-// TODO: Write comment
+/**
+ * struct kbd_dev - Per-device state for the keyboard driver
+ * @cdev:   Character device structure registered with the kernel
+ * @lock:   Spinlock protecting the circular buffer
+ * @buff:   Circular buffer storing received key characters
+ * @putIdx: Write index into the circular buffer
+ * @getIdx: Read index into the circular buffer
+ * @cnt:    Number of characters currently stored in the buffer
+ */
 typedef struct kbd_dev {
   struct cdev cdev;
   spinlock_t lock;
@@ -31,6 +39,12 @@ typedef struct kbd_dev {
   size_t cnt;
 } kbd_dev;
 
+/**
+ * @brief Retrieve the next character from the circular buffer
+ * @param c    Pointer to store the retrieved character
+ * @param data Pointer to the keyboard device containing the buffer
+ * @return true if a character was available, false if the buffer was empty
+ */
 static bool get_char(char *c, struct kbd_dev *data) {
 	if (data->cnt > 0) {
 		*c = data->buff[data->getIdx];
@@ -41,20 +55,35 @@ static bool get_char(char *c, struct kbd_dev *data) {
 
 	return false;
 }
-// File operations for the driver 
-// TODO: clean up comments
-// open
+/**
+ * @brief Open the keyboard device
+ * @param inode Inode structure for the device file
+ * @param file  File structure to associate with the device
+ * @return 0 on success
+ */
 static int kbd_open(struct inode* inode, struct file* file) {
   struct kbd_dev* data = container_of(inode->i_cdev, kbd_dev, cdev);
   file->private_data = data;
 
   return 0;
 }
-// release
+/**
+ * @brief Release the keyboard device
+ * @param inode Inode structure for the device file
+ * @param file  File structure associated with the device
+ * @return 0 on success
+ */
 static int kbd_release(struct inode* inode, struct file* file) {
   return 0;
 }
-// read
+/**
+ * @brief Read characters from the keyboard buffer into userspace
+ * @param file   File structure for the open device
+ * @param uBuff  Userspace buffer to copy characters into
+ * @param size   Maximum number of bytes to read
+ * @param offset File position (unused)
+ * @return Number of bytes read, or -EFAULT on copy failure
+ */
 static ssize_t kbd_read(struct file *file,  char *uBuff, size_t size, loff_t *offset) {
 	struct kbd_dev *data = (struct kbd_dev *) file->private_data;
 	size_t read = 0;
@@ -79,13 +108,24 @@ static ssize_t kbd_read(struct file *file,  char *uBuff, size_t size, loff_t *of
 	return read;
 }
 
+/**
+ * @brief Reset the circular buffer to its initial empty state
+ * @param dev Pointer to the keyboard device whose buffer is reset
+ */
 static void reset_buffer(kbd_dev* dev) {
   dev->cnt    = 0;
   dev->getIdx = 0;
   dev->putIdx = 0;
 }
 
-// Write
+/**
+ * @brief Write handler that clears the keyboard buffer
+ * @param file   File structure for the open device
+ * @param uBuff  Userspace buffer (unused, buffer is simply cleared)
+ * @param size   Number of bytes written
+ * @param offset File position (unused)
+ * @return The number of bytes requested (always succeeds)
+ */
 static ssize_t kbd_write(struct file* file, const char* uBuff, size_t size, loff_t* offset) {
   kbd_dev* dev = (kbd_dev*) file->private_data;
   unsigned long flags;
@@ -97,7 +137,9 @@ static ssize_t kbd_write(struct file* file, const char* uBuff, size_t size, loff
   return size;
 }
 
-// TODO: Write comment kbd_fops
+/**
+ * @brief File operations table for the keyboard character device
+ */
 static const struct file_operations kbd_fops = {
   .owner = THIS_MODULE,
   .open  = kbd_open,
@@ -109,29 +151,39 @@ static const struct file_operations kbd_fops = {
 // intialzie max amount of devices under teh driver
 static kbd_dev devs[NUM_MINORS];
 
-// Read key pressed
+/**
+ * @brief Read a scancode byte from the i8042 data register
+ * @return The scancode byte read from the keyboard controller
+ */
 static u8 i8042_read_data(void) {
  u8 val = inb(I8042_DATA_REG);
  return val;
 }
 
-/*
- * Checks if scancode corresponds to key press or release.
+/**
+ * @brief Check if a scancode corresponds to a key press event
+ * @param scancode Raw scancode from the keyboard controller
+ * @return Non-zero if the scancode is a key press, 0 if a key release
  */
 static int is_key_press(unsigned int scancode) {
 	return !(scancode & SCANCODE_RELEASED_MASK);
 }
 
+/**
+ * @brief Store a character into the circular buffer
+ * @param data Pointer to the keyboard device containing the buffer
+ * @param ch   Character to store
+ */
 static void put_char(kbd_dev* data, char ch) {
   data->buff[data->getIdx] = ch;
 	data->putIdx = (data->putIdx + 1) % BUFF_SIZE;
   data->cnt++;
 }
 
-/*
- * Return the character of the given scancode.
- * Only works for alphanumeric/space/enter; returns '?' for other
- * characters.
+/**
+ * @brief Convert a scancode to its ASCII character representation
+ * @param scancode Raw scancode from the keyboard controller
+ * @return ASCII character for alphanumeric/space/enter keys, '?' for others
  */
 static int get_ascii(unsigned int scancode) {
 	static char *row1 = "1234567890";
@@ -155,9 +207,12 @@ static int get_ascii(unsigned int scancode) {
 	return '?';
 }
 
-// @brief Interrupt Handler for keyboard
-// @param irq 
-// TODO: update comment here
+/**
+ * @brief Interrupt handler for keyboard key press events
+ * @param irq_no IRQ number that triggered the interrupt
+ * @param devID  Pointer to the kbd_dev associated with this IRQ
+ * @return IRQ_NONE (shared IRQ, other handlers may also process)
+ */
 static irqreturn_t kbd_irq_handler(int irq_no, void* devID) {
   u32 scancode = i8042_read_data();
   int pressed = is_key_press(scancode);
@@ -177,6 +232,10 @@ static irqreturn_t kbd_irq_handler(int irq_no, void* devID) {
   return IRQ_NONE;
 }
 
+/**
+ * @brief Initialize the keyboard driver module
+ * @return 0 on success, negative error code on failure
+ */
 static int kbd_init(void) {
   pr_info("[LOG] kbd driver intialized\n");
   int res = 0;
@@ -221,6 +280,9 @@ static int kbd_init(void) {
 
   return res;
 }
+/**
+ * @brief Clean up and unregister the keyboard driver module
+ */
 static void kbd_exit(void) {
   pr_info("[LOG] kbd driver exited\n");
 
