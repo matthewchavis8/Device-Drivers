@@ -1,27 +1,42 @@
+/**
+ * @file list.c
+ * @brief Module demonstrating kernel linked list operations with task info nodes
+ * @author Matthew Chavis
+ */
+
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/slab.h>
 
+/**
+ * struct taskInfo - Node storing a process snapshot in a kernel linked list
+ * @pid:       Process ID
+ * @timestamp: Jiffies value when the node was allocated
+ * @node:      Kernel list_head for linking into the list
+ */
 typedef struct taskInfo {
   pid_t pid;
   ulong timestamp;
   struct list_head node;
 } taskInfo;
 
-// @brief Allocate via kmalloc
 static taskInfo* alloc_task_info(pid_t pid);
-// @brief print out the taskInfo
 static void print_task_info(taskInfo* tsk);
-// @brief appends task_info to the list
 static void task_info_add_for_current(int pid);
-// @brief print the list out
 static void task_info_print_list(void);
-// @brief delete all list entries
 static void task_info_purge_list(void);
 
-// Start of the Kernel List
+/** @brief Head of the kernel linked list */
 static struct list_head head;
 
+/**
+ * @brief Initialize the module and populate the list with process hierarchy info
+ *
+ * Initializes the list head, then adds taskInfo nodes for the current process,
+ * its parent, grandparent, and great-grandparent.
+ *
+ * @return 0 on success
+ */
 static int init_kernel_list(void) {
 	INIT_LIST_HEAD(&head);
   task_info_add_for_current(current->pid);
@@ -34,6 +49,9 @@ static int init_kernel_list(void) {
   return 0;
 }
 
+/**
+ * @brief Clean up the module by printing and then purging the entire list
+ */
 static void exit_kernel_list(void) {
   task_info_print_list();
   task_info_purge_list();
@@ -41,6 +59,9 @@ static void exit_kernel_list(void) {
   pr_info("[LOG] unloading the kernel list module\n");
 }
 
+/**
+ * @brief Walk the list and print each taskInfo entry
+ */
 static void task_info_print_list(void) {
   struct list_head* curr; // Current Node
   taskInfo* currTsk;      // Current Task
@@ -52,6 +73,9 @@ static void task_info_print_list(void) {
   }
 }
 
+/**
+ * @brief Remove and free every entry from the list using list_for_each_safe
+ */
 static void task_info_purge_list(void) {
   struct list_head* curr; // Current Node
   struct list_head* tmp;  // tmp     Node
@@ -65,6 +89,10 @@ static void task_info_purge_list(void) {
   }
 }
 
+/**
+ * @brief Allocate a taskInfo for a PID, initialize its list node, and add it to the list
+ * @param pid Process ID to create a taskInfo entry for
+ */
 static void task_info_add_for_current(int pid) {
   // Alloc memory for the taskInfo
   taskInfo* tsk;
@@ -79,6 +107,11 @@ static void task_info_add_for_current(int pid) {
   list_add(&tsk->node, &head);
 }
 
+/**
+ * @brief Allocate and initialize a taskInfo struct for a given PID
+ * @param pid Process ID to store in the new taskInfo
+ * @return Pointer to the allocated taskInfo, or NULL on failure
+ */
 static taskInfo* alloc_task_info(pid_t pid) {
   taskInfo* t;
 
@@ -96,6 +129,10 @@ static taskInfo* alloc_task_info(pid_t pid) {
   return t;
 }
 
+/**
+ * @brief Print the PID and timestamp of a taskInfo struct
+ * @param tsk Pointer to the taskInfo to print
+ */
 static void print_task_info(taskInfo* tsk) {
   pr_info("tsk->id: %d\n", tsk->pid);
   pr_info("tsk->timestamp: %lx\n", tsk->timestamp);

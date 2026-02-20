@@ -1,19 +1,29 @@
+/**
+ * @file kernelMemory.c
+ * @brief Module demonstrating dynamic allocation of task info structs from the process hierarchy
+ * @author Matthew Chavis
+ */
+
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
 
+/**
+ * struct taskInfo - Stores a snapshot of a process's PID and timestamp
+ * @pid:       Process ID captured at allocation time
+ * @timestamp: Jiffies value when the struct was allocated
+ */
 typedef struct taskInfo {
   pid_t pid;
   ulong timestamp;
 } taskInfo;
 
-// 4 TaskInfo objects
-/*static taskInfo* t1;*/
-/*static taskInfo* t2;*/
-/*static taskInfo* t3;*/
-/*static taskInfo* t4;*/
-
+/**
+ * @brief Allocate and initialize a taskInfo struct for a given PID
+ * @param pid Process ID to store in the new taskInfo
+ * @return Pointer to the allocated taskInfo, or NULL on allocation failure
+ */
 static taskInfo* alloc_task_info(pid_t pid) {
   taskInfo* t;
 
@@ -31,11 +41,23 @@ static taskInfo* alloc_task_info(pid_t pid) {
   return t;
 }
 
+/**
+ * @brief Print the PID and timestamp of a taskInfo struct
+ * @param tsk Pointer to the taskInfo to print
+ */
 static void print_task_info(taskInfo* tsk) {
   pr_info("tsk->id: %d\n", tsk->pid);
   pr_info("tsk->timestamp: %lx\n", tsk->timestamp);
 }
 
+/**
+ * @brief Initialize the module by allocating taskInfo for the current process hierarchy
+ *
+ * Allocates taskInfo structs for the current process, its parent,
+ * grandparent, and great-grandparent, prints them, then frees the memory.
+ *
+ * @return 0 on success
+ */
 static int memoryInit(void) {
   taskInfo* currProcess             = alloc_task_info(current->pid);
   taskInfo* parentProcess           = alloc_task_info(current->parent->pid);
@@ -57,6 +79,9 @@ static int memoryInit(void) {
   return 0;
 }
 
+/**
+ * @brief Clean up the module
+ */
 static void memoryExit(void) {
   pr_info("[LOG] kernemMemory Module has been unloaded\n");
 }

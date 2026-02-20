@@ -1,3 +1,9 @@
+/**
+ * @file cmd-mod.c
+ * @brief Module demonstrating command-line parameter passing via module_param
+ * @author Matthew Chavis
+ */
+
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
@@ -6,20 +12,27 @@
 
 static char *str = "the D:)";
 
-
+/**
+ * @brief Initialize the module and print the string parameter
+ * @return 0 on success
+ */
 static int cmd_init(void) {
 	printk("Early bird gets %s\n", str);
 	return 0;
 }
 
+/**
+ * @brief Clean up the module and print the string parameter
+ */
 static void cmd_exit(void) {
 	printk("The Bird left the %s\n", str);
 }
 
-/*
- * First Param: param name
- * Second Param: param type
- * Third Param:  Param permissions
+/**
+ * module_param(str, charp, 0000) - Register @str as a loadable module parameter.
+ *   - First param:  parameter name
+ *   - Second param: parameter type (charp = char pointer / string)
+ *   - Third param:  sysfs permissions (0000 = not visible in sysfs)
  */
 module_param(str, charp, 0000);
 MODULE_PARM_DESC(str, "A simple string");

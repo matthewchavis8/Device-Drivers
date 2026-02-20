@@ -1,3 +1,13 @@
+/**
+ * @file list-sync.c
+ * @brief Synchronized kernel linked list module using rwlock for concurrent access
+ * @author Matthew Chavis
+ *
+ * Exports task_info_add_for_current(), task_info_print_list(), and
+ * task_info_remove_expired() via EXPORT_SYMBOL so other modules (e.g.
+ * list-sym.c) can manipulate the shared list.
+ */
+
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
@@ -5,6 +15,13 @@
 #include <linux/list.h>
 #include <linux/sched/signal.h>
 
+/**
+ * struct task_info - Node storing a process snapshot with atomic reference counting
+ * @pid:       Process ID
+ * @timestamp: Jiffies value when the node was allocated
+ * @count:     Atomic counter tracking accesses or updates to this entry
+ * @list:      Kernel list_head for linking into the shared list
+ */
 struct task_info {
 	pid_t pid;
 	unsigned long timestamp;
@@ -18,8 +35,14 @@ void task_info_print_list(const char *msg);
 void task_info_remove_expired(void);
 static struct list_head head;
 
+/** @brief Read-write lock protecting the shared task_info list */
 DEFINE_RWLOCK(lock);
 
+/**
+ * @brief Allocate and initialize a task_info struct for a given PID
+ * @param pid Process ID to store in the new task_info
+ * @return Pointer to the allocated task_info, or NULL on failure
+ */
 static struct task_info *task_info_alloc(int pid)
 {
 	struct task_info *ti;
@@ -34,6 +57,11 @@ static struct task_info *task_info_alloc(int pid)
 	return ti;
 }
 
+/**
+ * @brief Search the list for a task_info matching a given PID (caller must hold lock)
+ * @param pid Process ID to search for
+ * @return Pointer to the matching task_info, or NULL if not found
+ */
 static struct task_info *task_info_find_pid(int pid)
 {
 	struct list_head *p;
@@ -49,6 +77,15 @@ static struct task_info *task_info_find_pid(int pid)
 	return NULL;
 }
 
+/**
+ * @brief Add a PID to the list, or update its timestamp if already present
+ *
+ * Acquires the write lock to check for an existing entry. If found, updates
+ * its timestamp and increments the count. Otherwise allocates a new entry
+ * and inserts it at the head of the list.
+ *
+ * @param pid Process ID to add or update
+ */
 static void task_info_add_to_list(int pid)
 {
 	struct task_info *ti;
@@ -69,6 +106,12 @@ static void task_info_add_to_list(int pid)
 	write_unlock(&lock);
 }
 
+/**
+ * @brief Add task_info entries for the current process and its neighbors
+ *
+ * Adds entries for the current PID, its parent, and the next two tasks
+ * in the task list. Exported via EXPORT_SYMBOL for use by other modules.
+ */
 void task_info_add_for_current(void) {
 	task_info_add_to_list(current->pid);
 	task_info_add_to_list(current->parent->pid);
@@ -77,6 +120,12 @@ void task_info_add_for_current(void) {
 }
 EXPORT_SYMBOL(task_info_add_for_current);
 
+/**
+ * @brief Print all entries in the list under a read lock
+ * @param msg Label prefix printed before the list contents
+ *
+ * Exported via EXPORT_SYMBOL for use by other modules.
+ */
 void task_info_print_list(const char *msg)
 {
 	struct list_head *p;
@@ -94,6 +143,15 @@ void task_info_print_list(const char *msg)
 }
 EXPORT_SYMBOL(task_info_print_list);
 
+/**
+ * @brief Remove entries that are expired and under-referenced
+ *
+ * An entry is removed if more than 3 seconds (3 * HZ jiffies) have elapsed
+ * since its timestamp and its atomic count is less than 5. Acquires the
+ * write lock for safe deletion.
+ *
+ * Exported via EXPORT_SYMBOL for use by other modules.
+ */
 void task_info_remove_expired(void)
 {
 	struct list_head *p, *q;
@@ -111,6 +169,9 @@ void task_info_remove_expired(void)
 }
 EXPORT_SYMBOL(task_info_remove_expired);
 
+/**
+ * @brief Remove and free every entry from the list under a write lock
+ */
 static void task_info_purge_list(void)
 {
 	struct list_head *p, *q;
@@ -125,6 +186,14 @@ static void task_info_purge_list(void)
 	write_unlock(&lock);
 }
 
+/**
+ * @brief Initialize the module, populate the list, then sleep for 5 seconds
+ *
+ * Sleeps after populating the list to allow external modules (loaded via
+ * list-sym) to call the exported functions during the timeout window.
+ *
+ * @return 0 on success
+ */
 static int list_sync_init(void)
 {
 	INIT_LIST_HEAD(&head);
@@ -138,6 +207,9 @@ static int list_sync_init(void)
 	return 0;
 }
 
+/**
+ * @brief Clean up the module by marking one entry, removing expired, and purging
+ */
 static void list_sync_exit(void)
 {
 	struct task_info *ti;
@@ -155,4 +227,3 @@ module_exit(list_sync_exit);
 MODULE_DESCRIPTION("Messing around with critical section in list");
 MODULE_AUTHOR("Matthew Chavis");
 MODULE_LICENSE("GPL");
-

@@ -1,3 +1,9 @@
+/**
+ * @file kbd.c
+ * @brief Keyboard character device driver using the i8042 controller
+ * @author Matthew Chavis
+ */
+
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/module.h>

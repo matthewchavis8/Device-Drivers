@@ -1,3 +1,9 @@
+/**
+ * @file kernelAlloc-mod.c
+ * @brief Module demonstrating kernel heap allocation with kmalloc/kfree
+ * @author Matthew Chavis
+ */
+
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/slab.h>
@@ -5,6 +11,14 @@
 static char* kMemBuff;
 static char* strToCpy = "The Dog is Black\n";
 
+/**
+ * @brief Allocate a 4096-byte kernel buffer and copy a string into it
+ *
+ * Uses kmalloc() to allocate a buffer from the kernel heap, copies a
+ * predefined string into it, and prints the contents character by character.
+ *
+ * @return 0 on success, -ENOMEM if allocation fails
+ */
 static int allocBuff(void) {
   // Allocating the buffer
   kMemBuff = kmalloc(4096, GFP_KERNEL);
@@ -29,6 +43,9 @@ static int allocBuff(void) {
   return 0;
 }
 
+/**
+ * @brief Free the kernel-allocated buffer and unload the module
+ */
 static void exitKernelAlloc(void) {
   // Freeing the Memory for kalloc
   if (kMemBuff)

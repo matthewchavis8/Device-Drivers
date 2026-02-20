@@ -1,3 +1,9 @@
+/**
+ * @file so2_cdev.c
+ * @brief Character device driver with open/read/write/release operations and single-reader enforcement
+ * @author Matthew Chavis
+ */
+
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -13,6 +19,13 @@
 #define MESSAGE       "the dog is matt"
 #define MSG_MAX       128
 
+/**
+ * struct so2_device_data - Per-device state for the so2 character device
+ * @cdev:    Character device structure registered with the kernel
+ * @isOpen:  Atomic flag ensuring only one reader at a time
+ * @msg:     Message buffer for read/write operations
+ * @msg_len: Current length of the stored message
+ */
 struct so2_device_data {
   struct cdev cdev; // Represents char device
   atomic_t isOpen;  // Atomic variable to ensure only one reader
@@ -23,6 +36,12 @@ struct so2_device_data {
 // Number of devices
 struct so2_device_data devices[NUM_MINORS];
 
+/**
+ * @brief Open the character device and enforce single-reader access
+ * @param inode Inode structure for the device file
+ * @param file  File structure to associate with the device
+ * @return 0 on success, -EBUSY if the device is already open
+ */
 static int so2_open(struct inode* inode, struct file* file) {
   struct so2_device_data* data;
   pr_info("%s method 'open' was called!\n", MODULE_NAME);
@@ -40,6 +59,14 @@ static int so2_open(struct inode* inode, struct file* file) {
   return 0;
 }
 
+/**
+ * @brief Read from the device message buffer into userspace
+ * @param file   File structure for the open device
+ * @param uBuff  Userspace buffer to copy data into
+ * @param size   Maximum number of bytes to read
+ * @param offset Current file position, advanced by the number of bytes read
+ * @return Number of bytes read, 0 at EOF, or negative errno on error
+ */
 static ssize_t so2_read(struct file* file, char __user* uBuff, size_t size, loff_t* offset) {
   pr_info("%s method 'read' was called!\n", MODULE_NAME);
 
@@ -51,7 +78,7 @@ static ssize_t so2_read(struct file* file, char __user* uBuff, size_t size, loff
   // Check string length
   if (*offset >= lenOfStr)
     return 0;
-  
+
   size_t available = lenOfStr - (size_t)*offset;
   size_t n = (size < available) ? size : available;
   // Copy kernel buff -> user buff
@@ -64,9 +91,17 @@ static ssize_t so2_read(struct file* file, char __user* uBuff, size_t size, loff
   return (ssize_t)size;
 }
 
+/**
+ * @brief Write from userspace into the device message buffer
+ * @param file   File structure for the open device
+ * @param uBuff  Userspace buffer containing data to write
+ * @param size   Number of bytes to write
+ * @param offset File position, reset to 0 after write
+ * @return Number of bytes written, or negative errno on error
+ */
 static ssize_t so2_write(struct file* file, const char* uBuff, size_t size, loff_t* offset) {
   pr_info("%s method 'write' was called!\n", MODULE_NAME);
-  
+
   struct so2_device_data* data = (struct so2_device_data*) file->private_data;
   size_t n = (size < (MSG_MAX - 1)) ? size : (MSG_MAX - 1);
 
@@ -82,6 +117,12 @@ static ssize_t so2_write(struct file* file, const char* uBuff, size_t size, loff
   return (ssize_t) size;
 }
 
+/**
+ * @brief Release the character device and reset the open flag
+ * @param inode Inode structure for the device file
+ * @param file  File structure associated with the device
+ * @return 0 on success
+ */
 static int so2_release(struct inode* inode, struct file* file) {
   struct so2_device_data* data;
   pr_info("%s method 'close' was called!\n", MODULE_NAME);
@@ -98,7 +139,9 @@ static int so2_release(struct inode* inode, struct file* file) {
   return 0;
 }
 
-// Driver operations that will be overloaded
+/**
+ * @brief File operations table for the so2 character device
+ */
 const struct file_operations so2_fops = {
   .owner    = THIS_MODULE,
   .read     = so2_read,
@@ -107,6 +150,10 @@ const struct file_operations so2_fops = {
   .release  = so2_release,
 };
 
+/**
+ * @brief Register the character device region and initialize all minor devices
+ * @return 0 on success, negative errno on failure
+ */
 static int so2_cdev_init(void) {
   int result;
 
@@ -129,6 +176,9 @@ static int so2_cdev_init(void) {
   return 0;
 }
 
+/**
+ * @brief Unregister all minor devices and release the character device region
+ */
 static void so2_cdev_exit(void) {
   pr_info("[LOG] Unregistered %s from kernel space\n", MODULE_NAME);
   // Delete all the devices
