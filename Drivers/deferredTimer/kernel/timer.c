@@ -5,14 +5,30 @@
 #include <linux/sched.h>
 #include <linux/uaccess.h>
 #include <linux/fs.h>
+#include <linux/timer.h>
+#include "../include/deferred.h"
 
 #define MAJOR_NUMBER  42
 #define MINOR_NUMBER  0
 #define NUM_MINORS    1
 #define MODULE_NAME   "timerDriver"
 
+#define TIMER_TYPE_NONE		-1
+#define TIMER_TYPE_SET		0
+#define TIMER_TYPE_ALLOC	1
+#define TIMER_TYPE_MON		2
+
+typedef unsigned int  ui;
+typedef unsigned long ul;
+
+static void timer_handler(struct timer_list* timer) {
+  pr_info("[timer_handler]");
+}
+
 typedef struct timer_dev {
-  struct cdev cdev;
+  struct cdev       cdev;
+  struct timer_list timer;
+  int               flag;
 } timer_dev;
 
 static struct timer_dev devices[NUM_MINORS];
@@ -31,11 +47,31 @@ static int timer_release(struct inode* inode, struct file* file) {
   return 0;
 }
 
-static const struct file_operations timer_fops = {
-  .owner   = THIS_MODULE,
-  .open    = timer_open,
-  .release = timer_release,
+static long timer_ioctl(struct file* file, ui cmd, ul arg) {
+  struct timer_dev* data = (struct timer_dev*) file->private_data;
 
+  switch (cmd) {
+    case MY_IOCTL_TIMER_SET:
+      pr_info("[TIMER SET]\n");
+      data->flag = TIMER_TYPE_SET;
+      mod_timer(&data->timer, jiffies + arg * HZ);
+      break;
+    case MY_IOCTL_TIMER_CANCEL:
+      pr_info("[TIMER CANCEL]\n");
+      del_timer(&data->timer);
+      break;
+    default:
+      break;
+  }
+
+  return 0;
+}
+
+static const struct file_operations timer_fops = {
+  .owner          = THIS_MODULE,
+  .open           = timer_open,
+  .release        = timer_release,
+  .unlocked_ioctl = timer_ioctl,
 };
 
 
@@ -51,6 +87,7 @@ static int deferred_init(void) {
   for (int i = 0; i < NUM_MINORS; i++) {
     cdev_init(&devices[i].cdev, &timer_fops);
     cdev_add(&devices[i].cdev, MKDEV(MAJOR_NUMBER, i), 1);
+    timer_setup(&devices[i].timer, timer_handler, 0);
   }
 
   pr_info("[LOG] registered %s char device in memory success\n", MODULE_NAME);
@@ -63,6 +100,7 @@ static void deferred_exit(void) {
   // Delete all the devices
   for (int i = 0; i < NUM_MINORS; i++) {
     cdev_del(&devices[i].cdev);
+    del_timer(&devices[i].timer);
   }
 
   unregister_chrdev_region(MKDEV(MAJOR_NUMBER, MINOR_NUMBER), NUM_MINORS);
