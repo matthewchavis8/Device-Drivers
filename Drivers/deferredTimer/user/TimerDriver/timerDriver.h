@@ -20,6 +20,8 @@ class TimerDriver {
     void cancelTimer();
 
     void allocTimer();
+
+    void monitorTimer(unsigned long);
 };
 
 #endif // !TIMERDRIVER_H__

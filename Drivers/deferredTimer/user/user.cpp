@@ -42,6 +42,17 @@ int main(int argc, char* argv[]) {
       timer.allocTimer();
       break;
     }
+    
+    case 'p': {
+      if (argc != 3) {
+        std::cout << "[ERROR] argc not met" << '\n';
+        return 1;
+      }
+      
+      unsigned long pid = static_cast<unsigned long>(std::stoi(argv[2]));
+      timer.monitorTimer(pid);
+      break;
+    }
                 
     default:
       std::cout << "[ERROR] unknown cmd" << cmd << '\n';

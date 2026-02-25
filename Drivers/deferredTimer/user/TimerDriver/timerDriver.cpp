@@ -29,3 +29,11 @@ void TimerDriver::allocTimer() {
     return;
   }
 }
+
+void TimerDriver::monitorTimer(unsigned long pid) {
+  if (ioctl(m_fd, MY_IOCTL_TIMER_MONITOR, pid) < 0) {
+    std::cout << "[ERROR] timer failed to alloc" << '\n';
+    close(m_fd);
+    return;
+  }
+}
