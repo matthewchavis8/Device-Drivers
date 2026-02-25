@@ -1,34 +1,6 @@
 #include <iostream>
-#include <fcntl.h>
-#include <unistd.h>
-#include <sys/ioctl.h>
-#include "../include/deferred.h"
-#include <fstream>
-
-static const char* DRIVERPATH = "/dev/timerDriver";
-
-class TimerDriver {
-  private:
-    int m_fd{};
-  public:
-    TimerDriver() { m_fd = open(DRIVERPATH, O_RDONLY); }
-
-    void setTimer(int time) {
-      if (ioctl(m_fd, MY_IOCTL_TIMER_SET, time) < 0) {
-        std::cout << "[ERROR] Failed to set timer" << '\n';
-        close(m_fd);
-        return;
-      }
-    }
-    
-    void cancelTimer() {
-      if (ioctl(m_fd, MY_IOCTL_TIMER_CANCEL) < 0) {
-        std::cout << "[ERROR] timer failed to cancel" << '\n';
-        close(m_fd);
-        return;
-      }
-    }
-};
+#include <string>
+#include "TimerDriver/timerDriver.h"
 
 int main(int argc, char* argv[]) {
   if (argc < 2) {
