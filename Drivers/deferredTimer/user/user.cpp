@@ -18,7 +18,7 @@ int main(int argc, char* argv[]) {
         return 1;
       }
 
-      int duration = std::stoi(std::to_string(*argv[2]));
+      int duration = std::stoi(argv[2]);
       timer.setTimer(duration);
       break;
     }
@@ -33,6 +33,16 @@ int main(int argc, char* argv[]) {
       break;
     }
 
+    case 'a': {
+      if (argc != 2) {
+        std::cout << "[ERROR] argc not met" << '\n';
+        return 1;
+      }
+
+      timer.allocTimer();
+      break;
+    }
+                
     default:
       std::cout << "[ERROR] unknown cmd" << cmd << '\n';
   }

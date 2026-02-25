@@ -4,6 +4,7 @@
 #include <linux/cdev.h>
 #include <linux/sched.h>
 #include <linux/uaccess.h>
+#include <linux/timer.h>
 #include <linux/fs.h>
 #include <linux/timer.h>
 #include "../include/deferred.h"
@@ -21,8 +22,13 @@
 typedef unsigned int  ui;
 typedef unsigned long ul;
 
-static void timer_handler(struct timer_list* timer) {
-  pr_info("[timer_handler]");
+// Simulates a blocking operation
+static void alloc_io(void) {
+  int secs = 10;
+  set_current_state(TASK_INTERRUPTIBLE);
+  schedule_timeout(secs * HZ);
+
+  pr_info("[LOG] I went to sleep for 5 seconds im sleepy\n");
 }
 
 typedef struct timer_dev {
@@ -32,6 +38,23 @@ typedef struct timer_dev {
 } timer_dev;
 
 static struct timer_dev devices[NUM_MINORS];
+
+// Handler called when timer handler is called routes the correct flag to trigger
+static void timer_handler(struct timer_list* t) {
+  timer_dev* dev = (struct timer_dev*) from_timer(dev, t, timer);
+  pr_info("[timer_handler]\n");
+
+  switch (dev->flag) {
+    case TIMER_TYPE_SET:
+      break;
+    case TIMER_TYPE_ALLOC:
+      alloc_io();
+      break;
+    default:
+      break;
+  }
+
+}
 
 // FILE OPS
 static int timer_open(struct inode* inode, struct file* file) {
@@ -56,10 +79,18 @@ static long timer_ioctl(struct file* file, ui cmd, ul arg) {
       data->flag = TIMER_TYPE_SET;
       mod_timer(&data->timer, jiffies + arg * HZ);
       break;
+
     case MY_IOCTL_TIMER_CANCEL:
       pr_info("[TIMER CANCEL]\n");
       del_timer(&data->timer);
       break;
+
+    case MY_IOCTL_TIMER_ALLOC:
+      pr_info("[TIMER ALLOC]\n");
+      data->flag = TIMER_TYPE_ALLOC;
+      mod_timer(&data->timer, jiffies + arg * HZ);
+      break;
+
     default:
       break;
   }
@@ -88,6 +119,7 @@ static int deferred_init(void) {
     cdev_init(&devices[i].cdev, &timer_fops);
     cdev_add(&devices[i].cdev, MKDEV(MAJOR_NUMBER, i), 1);
     timer_setup(&devices[i].timer, timer_handler, 0);
+    devices[i].flag = TIMER_TYPE_NONE;
   }
 
   pr_info("[LOG] registered %s char device in memory success\n", MODULE_NAME);

@@ -18,6 +18,8 @@ class TimerDriver {
     void setTimer(int time);
     
     void cancelTimer();
+
+    void allocTimer();
 };
 
 #endif // !TIMERDRIVER_H__

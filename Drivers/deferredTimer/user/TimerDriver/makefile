@@ -2,7 +2,7 @@ CXX 			:= g++
 CXX_FLAGS := -O3 -Wall -Wextra -Werror
 SRC				:= timerDriver.cpp
 OBJ				:= timerDriver.o
-LIB				:= timerDriver.a
+LIB				:= libtimerDriver.a
 
 default:
 	$(CXX) $(CXX_FLAGS) -c $(SRC) -o $(OBJ)

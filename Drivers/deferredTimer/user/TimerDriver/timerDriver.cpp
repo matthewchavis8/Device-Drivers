@@ -21,3 +21,11 @@ void TimerDriver::cancelTimer() {
     return;
   }
 }
+
+void TimerDriver::allocTimer() {
+  if (ioctl(m_fd, MY_IOCTL_TIMER_ALLOC) < 0) {
+    std::cout << "[ERROR] timer failed to alloc" << '\n';
+    close(m_fd);
+    return;
+  }
+}
