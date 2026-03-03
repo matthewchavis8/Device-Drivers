@@ -53,8 +53,17 @@ int memory_mmap(struct file* flip, struct vm_area_struct* vma) {
   return remap_pfn_range(vma, vma->vm_start, pfn, size, vma->vm_page_prot);
 }
 
+int memory_open(struct inode* inode, struct file* file) {
+  struct mem_dev* data = container_of(inode->i_cdev, mem_dev, cdev);
+  file->private_data = data;
+
+  logg("memory_open called");
+  return 0;
+}
+
 static const struct file_operations dev_fops = {
   .mmap = memory_mmap,
+  .open = memory_open,
 };
 
 static mem_dev devs[NUM_MINORS];
