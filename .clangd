@@ -9,6 +9,13 @@ CompileFlags:
     - "-nostdinc"
     - "-D__KERNEL__"
     - "-DMODULE"
+    - "-I/usr/include/c++/14"
+    - "-I/usr/include/aarch64-linux-gnu/c++/14"
+    - "-I/usr/include/c++/14/backward"
+    - "-I/usr/lib/llvm-19/lib/clang/19/include"
+    - "-I/usr/local/include"
+    - "-I/usr/include/aarch64-linux-gnu"
+    - "-I/usr/include"
   Remove:
     - "-mabi=*"
     - "-march=*"
