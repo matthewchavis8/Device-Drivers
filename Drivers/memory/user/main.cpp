@@ -6,7 +6,6 @@ static inline void log(std::string_view msg) { std::cout << "[LOG] " << msg << '
 
 int main() {
   int fd = open(filePath, O_RDONLY);
-
   if (fd == 0)
     log("Failed to open memory driver");
 }

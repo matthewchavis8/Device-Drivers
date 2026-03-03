@@ -22,11 +22,6 @@
 #define MINOR_NUMBER  0
 #define NUM_MINORS    1
 #define MODULE_NAME   "memory_driver"
-#define BUFF_SIZE     100
-
-#define I8042_KBD_IRQ		  1
-#define I8042_STATUS_REG	0x64
-#define I8042_DATA_REG		0x60
 
 #define NPAGES 3
 
@@ -53,11 +48,13 @@ int memory_mmap(struct file* flip, struct vm_area_struct* vma) {
   return remap_pfn_range(vma, vma->vm_start, pfn, size, vma->vm_page_prot);
 }
 
+int memory_open(struct inode* inode, struct file* file);
 int memory_open(struct inode* inode, struct file* file) {
+  logg("memory_open called");
+
   struct mem_dev* data = container_of(inode->i_cdev, mem_dev, cdev);
   file->private_data = data;
 
-  logg("memory_open called");
   return 0;
 }
 
@@ -78,16 +75,6 @@ static int mydriver_init(void) {
     goto failedToAlloc;
   }
 
-  // request I/O ports
-  if (!request_region(I8042_DATA_REG, 1, MODULE_NAME)) {
-    res = -EBUSY;
-    goto releaseDataPort;
-  }
-  
-  if (!request_region(I8042_STATUS_REG, 1, MODULE_NAME)) {
-    res = -EBUSY;
-    goto releaseStatusPort;
-  }
 
   int i = 0;
   // Register device minors
@@ -117,17 +104,6 @@ static int mydriver_init(void) {
     ((char*)kmalloc_area)[i * PAGE_SIZE + 3] = 0xdd;
   }
   
-  // Register IRQ handler
-  /*for (int i = 0; i < NUM_MINORS; i++) {*/
-  /*  res = request_irq(I8042_KBD_IRQ, kbd_irq_handler, IRQF_SHARED, MODULE_NAME, &devs[i]);*/
-  /*}*/
-
-  releaseStatusPort:
-    release_region(I8042_STATUS_REG, 1);
-  releaseDataPort:
-    release_region(I8042_DATA_REG, 1);
-  /*releaseRegion:*/ // NOT USED FOR NOW
-  /*  unregister_chrdev_region(MKDEV(MAJOR_NUMBER, MINOR_NUMBER), NUM_MINORS);*/
   failedToAlloc:
     return res;
 
@@ -139,27 +115,19 @@ static int mydriver_init(void) {
 static void mydriver_exit(void) {
   pr_info("[LOG] memory driver exited\n");
 
-  // free IRQ
-  int i = 0;
-  for (i = 0; i < NUM_MINORS; i++) {
-    free_irq(I8042_KBD_IRQ, &devs[i].cdev);
-  }
-  
   // release devices 
+  int i = 0;
   for (i = 0; i < NUM_MINORS; i++) {
     cdev_del(&devs[i].cdev);
   }
 
-  // releasing the I/O ports
-  release_region(I8042_STATUS_REG, 1);
-  release_region(I8042_DATA_REG, 1);
 
   // release char device region
   unregister_chrdev_region(MKDEV(MAJOR_NUMBER, MINOR_NUMBER), NUM_MINORS);
 
   // free pages
   for (i = 0; i < NPAGES; i++) {
-    ClearPageReserved(virt_to_page(kmalloc_area * i * PAGE_SIZE));
+    ClearPageReserved(virt_to_page(kmalloc_area + i * PAGE_SIZE));
   }
   
   kfree(kmalloc_ptr);
@@ -168,6 +136,6 @@ static void mydriver_exit(void) {
 module_init(mydriver_init);
 module_exit(mydriver_exit);
 
-MODULE_DESCRIPTION("Making a keyboard device driver");
+MODULE_DESCRIPTION("Messing around with kernel and userspace mapping");
 MODULE_AUTHOR("Matthew Chavis");
 MODULE_LICENSE("GPL");
