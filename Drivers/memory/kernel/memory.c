@@ -84,7 +84,7 @@ static int mydriver_init(void) {
   }
 
   // Get ptr to unaligned kernel memory
-  kmalloc_ptr = kmalloc(NPAGES + 2, GFP_KERNEL);
+  kmalloc_ptr = kmalloc((NPAGES + 1) * PAGE_SIZE, GFP_KERNEL);
   if (!kmalloc_ptr)
     return -ENOMEM;
 
