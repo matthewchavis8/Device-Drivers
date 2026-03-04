@@ -66,7 +66,7 @@ int memory_mmap(struct file* file, struct vm_area_struct* vma) {
   for (offset = 0; offset < size; offset += PAGE_SIZE) {
     unsigned long pfn = vmalloc_to_pfn(vmalloc_area + offset);
 
-    int ret = remap_pfn_range(vma, vma->vm_start, pfn, size, vma->vm_page_prot);
+    int ret = remap_pfn_range(vma, vma->vm_start + offset, pfn, PAGE_SIZE, vma->vm_page_prot);
     if (ret)
       return ret;
   }
@@ -84,11 +84,13 @@ static int memory_seq_show(struct seq_file *seq, void *v) {
     if (!mm)
         return 0;
 
+    mmap_read_lock(mm);
     VMA_ITERATOR(chunk, mm, 0);
     for_each_vma(chunk, vma) {
         pr_info("%lx %lx\n", vma->vm_start, vma->vm_end);
         size += vma->vm_end - vma->vm_start;
     }
+    mmap_read_unlock(mm);
 
     mmput(mm); // frees the mm reference count
     seq_printf(seq, "%lu", size);
@@ -143,6 +145,7 @@ static int driver_initt(void) {
 
 static void driver_exit(void) {
   logg("non-contignous memory driver has exited");
+  remove_proc_entry(PROC_ENTRY_NAME, NULL);
   // release devices 
   int i = 0;
   for (i = 0; i < NUM_MINORS; i++) {
@@ -159,7 +162,6 @@ static void driver_exit(void) {
   }
   vfree(vmalloc_area);
 
-  remove_proc_entry(PROC_ENTRY_NAME, NULL);
 }
 
 module_init(driver_initt);
