@@ -1,6 +1,6 @@
 /**
- * @file kbd.c
- * @brief Keyboard character device driver using the i8042 controller
+ * @file memory.c
+ * @brief Character device driver demonstrating kernel-to-userspace memory mapping via mmap
  * @author Matthew Chavis
  */
 
@@ -36,6 +36,12 @@ static inline void logg(char* msg) {
 static void* kmalloc_ptr;
 static void* kmalloc_area;
 
+/**
+ * @brief Map kernel memory pages into userspace via mmap
+ * @param flip  File pointer for the device
+ * @param vma   Virtual memory area descriptor from userspace
+ * @return 0 on success, -EIO if requested size exceeds allocated pages
+ */
 int memory_mmap(struct file* flip, struct vm_area_struct* vma);
 int memory_mmap(struct file* flip, struct vm_area_struct* vma) {
 
@@ -48,6 +54,12 @@ int memory_mmap(struct file* flip, struct vm_area_struct* vma) {
   return remap_pfn_range(vma, vma->vm_start, pfn, size, vma->vm_page_prot);
 }
 
+/**
+ * @brief Open handler for the memory character device
+ * @param inode  Inode associated with the device file
+ * @param file   File pointer to store private data
+ * @return 0 on success
+ */
 int memory_open(struct inode* inode, struct file* file);
 int memory_open(struct inode* inode, struct file* file) {
   logg("memory_open called");
@@ -65,6 +77,14 @@ static const struct file_operations dev_fops = {
 
 static mem_dev devs[NUM_MINORS];
 
+/**
+ * @brief Initialize the memory driver module
+ *
+ * Registers the character device, allocates page-aligned kernel memory
+ * via kmalloc, reserves the pages, and writes magic numbers for testing.
+ *
+ * @return 0 on success, negative errno on failure
+ */
 static int mydriver_init(void) {
   logg("memory driver has been loaded");
   int res = 0;
@@ -110,7 +130,10 @@ static int mydriver_init(void) {
   return res;
 }
 /**
- * @brief Clean up and unregister the keyboard driver module
+ * @brief Clean up and unregister the memory driver module
+ *
+ * Deletes character devices, unregisters the chrdev region,
+ * clears reserved page flags, and frees the allocated memory.
  */
 static void mydriver_exit(void) {
   pr_info("[LOG] memory driver exited\n");

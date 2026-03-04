@@ -1,9 +1,16 @@
+/**
+ * @file main.cpp
+ * @brief Userspace program that mmaps kernel memory from the memory driver
+ * @author Matthew Chavis
+ */
+
 #include <iostream>
 #include <sys/mman.h>
 #include <cstdint>
 #include <fcntl.h>
 
 static const char* filepath = "/dev/memory_driver";
+
 static inline void log(std::string_view msg) { std::cout << "[log] " << msg << '\n'; }
 
 int main() {

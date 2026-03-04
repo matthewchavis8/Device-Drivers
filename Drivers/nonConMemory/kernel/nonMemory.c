@@ -1,3 +1,9 @@
+/**
+ * @file nonMemory.c
+ * @brief Character device driver using vmalloc for non-contiguous kernel-to-userspace memory mapping
+ * @author Matthew Chavis
+ */
+
 #include "asm/current.h"
 #include "asm/memory.h"
 #include "asm/page-def.h"
@@ -30,16 +36,25 @@
 #define NPAGES 3
 #define PROC_ENTRY_NAME "nonmemory_driver_proc"
 
-void* vmalloc_area;
+void* vmalloc_area; /**< Pointer to vmalloc-allocated non-contiguous memory region */
 
+// NOTE: For some reason log has a linking issue the kernel automatically exposes 
+// a log symbol in the symbol tree so if I use `log` I get a multiple defintion error
 static inline void logg(char* msg) { pr_info("[LOG]: %s\n", msg); }
 
+/** @brief Character device structure wrapping a cdev */
 typedef struct memory_dev {
   struct cdev cdev;
 } memory_dev;
 
 memory_dev devs[NUM_MINORS];
 
+/**
+ * @brief Open handler for the non-contiguous memory device
+ * @param inode  Inode associated with the device file
+ * @param file   File pointer to store private data
+ * @return 0 on success
+ */
 int memory_open(struct inode* inode, struct file* file);
 int memory_open(struct inode* inode, struct file* file) {
   struct memory_dev* dev = container_of(inode->i_cdev, memory_dev, cdev);
@@ -48,6 +63,12 @@ int memory_open(struct inode* inode, struct file* file) {
 
   return 0;
 }
+/**
+ * @brief Release handler for the non-contiguous memory device
+ * @param inode  Inode associated with the device file
+ * @param file   File pointer
+ * @return 0 on success
+ */
 int memory_release(struct inode* inode, struct file* file);
 int memory_release(struct inode* inode, struct file* file) {
   logg("[memory_close called]");
@@ -55,6 +76,12 @@ int memory_release(struct inode* inode, struct file* file) {
   return 0;
 }
 
+/**
+ * @brief Map vmalloc pages into userspace one page at a time
+ * @param file  File pointer for the device
+ * @param vma   Virtual memory area descriptor from userspace
+ * @return 0 on success, -1 if size exceeds allocated pages, negative errno on remap failure
+ */
 int memory_mmap(struct file* file, struct vm_area_struct* vma);
 int memory_mmap(struct file* file, struct vm_area_struct* vma) {
   unsigned long size = vma->vm_end - vma->vm_start;
@@ -74,6 +101,16 @@ int memory_mmap(struct file* file, struct vm_area_struct* vma) {
   return 0;
 }
 
+/**
+ * @brief seq_file show callback that computes the total virtual address space of the calling process
+ *
+ * Iterates over all VMAs of the current process and sums up their sizes.
+ * Outputs the total size in bytes via seq_printf.
+ *
+ * @param seq  seq_file handle for output
+ * @param v    Iterator position (unused)
+ * @return 0 on success
+ */
 static int memory_seq_show(struct seq_file* seq, void* v);
 static int memory_seq_show(struct seq_file *seq, void *v) {
     struct vm_area_struct *vma;
@@ -97,6 +134,12 @@ static int memory_seq_show(struct seq_file *seq, void *v) {
     return 0;
 }
 
+/**
+ * @brief Open handler for the /proc entry using single_open
+ * @param inode  Inode for the proc file
+ * @param file   File pointer
+ * @return 0 on success, negative errno on failure
+ */
 static int memory_seq_open(struct inode* inode, struct file* file) {
   return single_open(file, memory_seq_show, NULL);
 }
@@ -113,6 +156,14 @@ static const struct proc_ops proc_ops = {
   .proc_release = single_release,
 };
 
+/**
+ * @brief Initialize the non-contiguous memory driver module
+ *
+ * Creates a /proc entry, registers the character device, allocates
+ * non-contiguous memory via vmalloc, and reserves the pages.
+ *
+ * @return 0 on success, negative errno on failure
+ */
 static int driver_initt(void) {
   logg("non-contignous memory driver has been initalized");
   int res = 0;
@@ -143,6 +194,12 @@ static int driver_initt(void) {
   return res;
 }
 
+/**
+ * @brief Clean up and unregister the non-contiguous memory driver module
+ *
+ * Removes the /proc entry, deletes character devices, unregisters the
+ * chrdev region, clears reserved page flags, and frees the vmalloc memory.
+ */
 static void driver_exit(void) {
   logg("non-contignous memory driver has exited");
   remove_proc_entry(PROC_ENTRY_NAME, NULL);
