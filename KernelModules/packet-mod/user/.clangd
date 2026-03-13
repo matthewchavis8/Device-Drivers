@@ -1,0 +1,11 @@
+CompileFlags:
+  CompilationDatabase: .
+  Add:
+   - --include-directory=/usr/libexec/gcc/aarch64-linux-gnu/14/cc1plus -E -quiet -v -imultiarch aarch64-linux-gnu -D_GNU_SOURCE - -mlittle-endian -mabi=lp64 -fasynchronous-unwind-tables -dumpbase -
+   - --include-directory=/usr/include/c++/14
+   - --include-directory=/usr/include/aarch64-linux-gnu/c++/14
+   - --include-directory=/usr/include/c++/14/backward
+   - --include-directory=/usr/lib/gcc/aarch64-linux-gnu/14/include
+   - --include-directory=/usr/local/include
+   - --include-directory=/usr/include/aarch64-linux-gnu
+   - --include-directory=/usr/include

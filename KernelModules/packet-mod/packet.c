@@ -10,7 +10,13 @@
 #include "print.h"
 
 static u32 packet_hook(void* priv, struct sk_buff* sbuf, const struct nf_hook_state* state) {
+  struct iphdr* iph = ip_hdr(sbuf);
+  if (!iph)
+    return NF_ACCEPT;
 
+  pr_info("[IP HEADER]: DST IP:%ip4", iph->daddr);
+  pr_info("[IP HEADER]: SRC IP:%ip4", iph->saddr);
+  pr_info("[IP HEADER]: protocol:%u", iph->protocol);
 
   return NF_ACCEPT;
 }
