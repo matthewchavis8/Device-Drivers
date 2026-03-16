@@ -19,12 +19,10 @@ void Socket::connect(std::string_view ip, uint16_t port) const {
   addr.sin_port   = htons(port);
 
   // Convert IP address into a binary network representation and write into addr
-  int addr_pton = ::inet_pton(AF_INET, ip.data(), &addr.sin_addr) != 1;
-  if (addr_pton != 1)
+  if (::inet_pton(AF_INET, ip.data(), &addr.sin_addr) != 1)
     throw std::runtime_error("[ERROR] inet_pton() failed\n");
 
-  int tcp_connect = ::connect(m_fd, reinterpret_cast<const sockaddr*>(&addr), sizeof(addr));
-  if (tcp_connect < 1)
+  if (::connect(m_fd, reinterpret_cast<const sockaddr*>(&addr), sizeof(addr)) < 0)
     throw std::runtime_error("[ERROR] connection failed\n");
 }
 
